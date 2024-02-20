@@ -1,0 +1,12 @@
+apiVersion: kronos.demo.wecraft.tn/v1
+kind: SleepDeployment
+metadata:
+  labels:
+    app.kubernetes.io/name: sleepdeployment
+    app.kubernetes.io/instance: sleepdeployment-sample
+    app.kubernetes.io/part-of: sleepdeployment
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: sleepdeployment
+  name: sleepdeployment-sample
+spec:
+  # TODO(user): Add fields here

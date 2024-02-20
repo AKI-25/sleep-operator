@@ -1,0 +1,27 @@
+# permissions for end users to view sleepdeployments.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: clusterrole
+    app.kubernetes.io/instance: sleepdeployment-viewer-role
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/created-by: sleepdeployment
+    app.kubernetes.io/part-of: sleepdeployment
+    app.kubernetes.io/managed-by: kustomize
+  name: sleepdeployment-viewer-role
+rules:
+- apiGroups:
+  - kronos.demo.wecraft.tn
+  resources:
+  - sleepdeployments
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - kronos.demo.wecraft.tn
+  resources:
+  - sleepdeployments/status
+  verbs:
+  - get

@@ -1,0 +1,14 @@
+apiVersion: demo.demo.wecraft.tn/v1
+kind: SleepDeployment
+metadata:
+  labels:
+    app.kubernetes.io/name: sleepdeployment
+    app.kubernetes.io/instance: sleepdeployment-sample
+    app.kubernetes.io/part-of: sleepdeployment
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: sleepdeployment
+  name: sleepdeployment-sample
+spec:
+  startsleep: "12:00"
+  endsleep: "13:00"
+  deploymentref: "worker-deployment"
