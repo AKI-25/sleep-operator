@@ -9,6 +9,6 @@ metadata:
     app.kubernetes.io/created-by: sleepdeployment
   name: sleepdeployment-sample
 spec:
-  startsleep: "12:00"
-  endsleep: "13:00"
+  startsleep: "11:14"
+  endsleep: "11:15"
   deploymentref: "worker-deployment"

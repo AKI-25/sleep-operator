@@ -18,16 +18,20 @@ package controller
 
 import (
 	"context"
+	"time"
 
 	"github.com/go-logr/logr"
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+
 	// v1 "k8s.io/client-go/applyconfigurations/apps/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	// "sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	// "sigs.k8s.io/controller-runtime/pkg/manager"
 
 	demov1 "wecraft-operator/api/v1"
 )
@@ -51,28 +55,52 @@ type SleepDeploymentReconciler struct {
 //
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.17.0/pkg/reconcile
+func isTimeToSleep(sleepDeployment *demov1.SleepDeployment, l logr.Logger) bool {
+
+	start, err := time.Parse("15:04", sleepDeployment.Spec.StartSleep)
+
+	if err != nil {
+		l.Info("Error - isTimeToSleep", "Couldn't parse start time", sleepDeployment.Spec.StartSleep)
+		return false
+	}
+	l.Info("isTimeToSleep", "start Hour", start.Hour(), "start Minute", start.Minute())
+	end, err := time.Parse("15:04", sleepDeployment.Spec.EndSleep)
+	if err != nil {
+		l.Info("Error - isTimeToSleep", "Couldn't parse end time", sleepDeployment.Spec.EndSleep)
+		return false
+	}
+	l.Info("isTimeToSleep", "end Hour", end.Hour(), "end Minute", end.Minute(), "end Month", end.Month(), "end Year", end.Year())
+
+	now := time.Now()
+	start = time.Date(now.Year(), now.Month(), now.Day(), start.Hour(), start.Minute(), 0, 0, now.Location())
+	end = time.Date(now.Year(), now.Month(), now.Day(), end.Hour(), end.Minute(), 0, 0, now.Location())
+	l.Info("isTimeToSleep", "current Hour", now.Hour(), "current Minute", now.Minute())
+	l.Info("verify", "bool", now.Before(end))
+	return now.After(start) && now.Before(end)
+}
+
 func (r *SleepDeploymentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	l := log.FromContext(ctx)
 	l.Info("Enter Reconcile", "Req", req)
 	sleepDeployment := &demov1.SleepDeployment{}
 	err := r.Get(ctx, types.NamespacedName{Name: req.Name, Namespace: req.Namespace}, sleepDeployment)
-	l.Info(sleepDeployment.Spec.EndSleep)
-	// l.Info("SleepAt: ", sleepDeployment.Spec.StartSleep)
-	// l.Info("EndSleepAt: ", sleepDeployment.Spec.EndSleep)
 	if sleepDeployment.Spec.StartSleep != sleepDeployment.Status.StartSleep {
 		sleepDeployment.Status.StartSleep = sleepDeployment.Spec.StartSleep
 		r.Status().Update(ctx, sleepDeployment)
 		return ctrl.Result{}, err
 	}
-	err = r.reconcileDeploy(ctx, sleepDeployment, l)
-	if err != nil {
-		l.Info("unable to reconcile Deployment", err)
-		return ctrl.Result{}, err
+	if isTimeToSleep(sleepDeployment, l) {
+		err = r.reconcileDeploy(ctx, sleepDeployment, l)
+		if err != nil {
+			l.Info("unable to reconcile Deployment", err)
+			return ctrl.Result{}, err
+		}
 	}
-	return ctrl.Result{}, nil
+	return ctrl.Result{Requeue: true}, nil
 }
 
 func (r *SleepDeploymentReconciler) reconcileDeploy(ctx context.Context, sleepDeployment *demov1.SleepDeployment, l logr.Logger) error {
+	l.Info("Enter Deployment Reconcile")
 	deploy := &appsv1.Deployment{}
 	l.Info(sleepDeployment.Spec.DeploymentRef)
 	err := r.Get(ctx, types.NamespacedName{Name: sleepDeployment.Spec.DeploymentRef, Namespace: sleepDeployment.Namespace}, deploy)
@@ -81,12 +109,17 @@ func (r *SleepDeploymentReconciler) reconcileDeploy(ctx context.Context, sleepDe
 		def := int32(0)
 		if deploy.Spec.Replicas != nil {
 			replicas = *deploy.Spec.Replicas
+			l.Info("Deployment Found", "replicas", replicas)
+			if deploy.Spec.Replicas != &def {
+				l.Info("Making deployment go to sleep...")
+				deploy.Spec.Replicas = &def
+				r.Update(ctx, deploy)
+				l.Info("Deployment went to sleep...")
+			} else {
+				l.Info("Deployment already in deep sleep! zzz...")
+			}
+
 		}
-		l.Info("Deployment Found", "replicas", replicas)
-		l.Info("Making deployment go to sleep...")
-		deploy.Spec.Replicas = &def
-		r.Update(ctx, deploy)
-		l.Info("Deployment went to sleep...")
 		return nil
 	}
 	if !errors.IsNotFound(err) {
