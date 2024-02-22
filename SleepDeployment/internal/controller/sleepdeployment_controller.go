@@ -22,13 +22,17 @@ import (
 
 	"github.com/go-logr/logr"
 	appsv1 "k8s.io/api/apps/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 
+	// corev1 "k8s.io/client-go/applyconfigurations/core/v1"
 	// v1 "k8s.io/client-go/applyconfigurations/apps/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
 	// "sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	// "sigs.k8s.io/controller-runtime/pkg/manager"
@@ -82,6 +86,7 @@ func isTimeToSleep(sleepDeployment *demov1.SleepDeployment, l logr.Logger) bool 
 func (r *SleepDeploymentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	l := log.FromContext(ctx)
 	l.Info("Enter Reconcile", "Req", req)
+
 	sleepDeployment := &demov1.SleepDeployment{}
 	err := r.Get(ctx, types.NamespacedName{Name: req.Name, Namespace: req.Namespace}, sleepDeployment)
 	if sleepDeployment.Spec.StartSleep != sleepDeployment.Status.StartSleep {
@@ -89,6 +94,22 @@ func (r *SleepDeploymentReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		r.Status().Update(ctx, sleepDeployment)
 		return ctrl.Result{}, err
 	}
+	secret := &v1.Secret{}
+	err = r.Get(ctx, types.NamespacedName{Name: "kronos-data", Namespace: req.Namespace}, secret)
+	if err == nil {
+		l.Info("Creating Secret..")
+		secret = &v1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: req.Namespace,
+				Name:      "kronos-data",
+			},
+		}
+		r.Create(ctx, secret)
+		l.Info("Secret Created")
+	} else {
+		l.Info("Secret Found", "Secret Name", secret.Name)
+	}
+
 	if isTimeToSleep(sleepDeployment, l) {
 		err = r.reconcileDeploy(ctx, sleepDeployment, l)
 		if err != nil {
